@@ -1,0 +1,17 @@
+/bin/
+/pkg/
+/dist/
+/coverage.out
+/.idea/
+/.vscode/
+*.log
+*.tmp
+*.DS_Store
+
+# Go tooling
+*.test
+*.cover
+
+# Trace/pprof artifacts
+*.trace
+*.pprof

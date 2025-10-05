@@ -1,0 +1,5 @@
+./command_buffer_test.go
+./commands_test.go
+./entity_test.go
+./scheduler_test.go
+./world_test.go
