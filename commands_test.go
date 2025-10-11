@@ -3,8 +3,8 @@ package ecs_test
 import (
 	"testing"
 
-	"github.com/yourorg/ecs"
-	ecsstorage "github.com/yourorg/ecs/ecs/storage"
+	"github.com/DangerosoDavo/ecs"
+	ecsstorage "github.com/DangerosoDavo/ecs/ecs/storage"
 )
 
 func TestCreateEntityCommand(t *testing.T) {

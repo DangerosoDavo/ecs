@@ -3,7 +3,7 @@ package storage
 import (
 	"fmt"
 
-	ecs "github.com/yourorg/ecs"
+	ecs "github.com/DangerosoDavo/ecs"
 )
 
 type denseStrategy struct{}

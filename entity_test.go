@@ -3,7 +3,7 @@ package ecs_test
 import (
 	"testing"
 
-	"github.com/yourorg/ecs"
+	"github.com/DangerosoDavo/ecs"
 )
 
 func TestEntityRegistryCreateAndDestroy(t *testing.T) {

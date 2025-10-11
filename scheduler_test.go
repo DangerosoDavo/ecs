@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yourorg/ecs"
+	"github.com/DangerosoDavo/ecs"
 )
 
 type testSystem struct {

@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	ecs "github.com/yourorg/ecs"
+	ecs "github.com/DangerosoDavo/ecs"
 )
 
 func TestDenseStoreCRUD(t *testing.T) {

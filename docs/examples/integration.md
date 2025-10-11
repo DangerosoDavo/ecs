@@ -5,7 +5,7 @@ This guide shows how to embed `github.com/yourorg/ecs` into a separate codebase.
 ## 1. Add the Dependency
 
 ```bash
-go get github.com/yourorg/ecs@latest
+go get github.com/DangerosoDavo/ecs@latest
 ```
 
 If you mirror dependencies, replace the module path accordingly.
@@ -25,13 +25,19 @@ type Position struct {
 type Velocity struct {
     VX, VY float64
 }
+
+type GameStats struct {
+    Health       int
+    AttackDamage int
+    Defense      int
+}
 ```
 
 ```go
 // movement_system.go
 package game
 
-import "github.com/yourorg/ecs"
+import "github.com/DangerosoDavo/ecs"
 
 type MovementSystem struct{}
 
@@ -80,15 +86,21 @@ import (
     "context"
     "time"
 
-    "github.com/yourorg/ecs"
-    ecsstorage "github.com/yourorg/ecs/ecs/storage"
-    "github.com/yourorg/ecs/examples/game"
+    "github.com/DangerosoDavo/ecs"
+    ecsstorage "github.com/DangerosoDavo/ecs/ecs/storage"
+    "github.com/DangerosoDavo/ecs/examples/game"
 )
 
 func buildScheduler() ecs.Scheduler {
     world := ecs.NewWorld()
+
+    // Use DenseStrategy for components unique to each entity
     world.RegisterComponent("Position", ecsstorage.NewDenseStrategy())
     world.RegisterComponent("Velocity", ecsstorage.NewDenseStrategy())
+
+    // Use SharedStrategy for components where many entities share the same values
+    // (e.g., all zombies share the same base stats)
+    world.RegisterComponent("GameStats", ecsstorage.NewSharedStrategy())
 
     scheduler, _ := ecs.NewScheduler(world)
 
@@ -141,7 +153,49 @@ A multiplayer arena combat server can split logic into work groups:
 
 The scheduler’s deterministic order, resource/component access validation, and deferred command pipeline make it easier to reason about simulation state while still allowing optional async work for non-critical tasks.
 
+## Choosing Storage Strategies
+
+The ECS provides two storage strategies for components:
+
+### DenseStrategy (Default)
+Use for components that are unique to each entity:
+- Position, velocity, rotation
+- Entity-specific state
+- Frequently modified data
+
+```go
+world.RegisterComponent("Position", ecsstorage.NewDenseStrategy())
+```
+
+### SharedStrategy (Memory-Efficient)
+Use for components where many entities share identical values:
+- Base stats for entity types (all zombies share zombie stats)
+- Configuration data
+- Archetype/template data
+
+```go
+world.RegisterComponent("GameStats", ecsstorage.NewSharedStrategy())
+
+// All zombies can share the same stats instance
+zombieStats := game.GameStats{Health: 50, AttackDamage: 10, Defense: 5}
+for i := 0; i < 100; i++ {
+    zombieID := world.Registry().Create()
+    cmds.Push(ecs.NewAddComponentCommand(zombieID, "GameStats", zombieStats))
+}
+// Memory: 1 GameStats instance instead of 100!
+```
+
+Shared components are immutable per entity. To modify a shared component, remove and re-add with new values:
+
+```go
+cmds.Push(ecs.NewRemoveComponentCommand(entityID, "GameStats"))
+cmds.Push(ecs.NewAddComponentCommand(entityID, "GameStats", upgradedStats))
+```
+
+See `docs/examples/game/shared_stats_example.go` for a complete working example.
+
 ## Additional Resources
 
 - [Observability guide](observability.md)
+- [Shared component examples](game/shared_stats_example.go)
 - `docs/examples` for more patterns (contributions welcome!)
