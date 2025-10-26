@@ -268,9 +268,12 @@ func validateSystemsAccess(mode WorkGroupMode, systems []System) (map[ComponentT
 			}
 			seenLocal[comp] = struct{}{}
 			if owner, exists := writeOwners[comp]; exists {
-				return nil, nil, nil, nil, fmt.Errorf("%w: %s and %s both write component %s", ErrDuplicateWriteAccess, owner, name, comp)
+				if mode != WorkGroupModeSynchronized {
+					return nil, nil, nil, nil, fmt.Errorf("%w: %s and %s both write component %s", ErrDuplicateWriteAccess, owner, name, comp)
+				}
+			} else {
+				writeOwners[comp] = name
 			}
-			writeOwners[comp] = name
 			writes[comp] = struct{}{}
 		}
 		resourceSeenLocal := make(map[string]struct{})
@@ -284,9 +287,12 @@ func validateSystemsAccess(mode WorkGroupMode, systems []System) (map[ComponentT
 				}
 				resourceSeenLocal[res.Name] = struct{}{}
 				if owner, exists := resourceWriteOwners[res.Name]; exists {
-					return nil, nil, nil, nil, fmt.Errorf("%w: %s and %s both write resource %s", ErrDuplicateResourceWriteAccess, owner, name, res.Name)
+					if mode != WorkGroupModeSynchronized {
+						return nil, nil, nil, nil, fmt.Errorf("%w: %s and %s both write resource %s", ErrDuplicateResourceWriteAccess, owner, name, res.Name)
+					}
+				} else {
+					resourceWriteOwners[res.Name] = name
 				}
-				resourceWriteOwners[res.Name] = name
 				resourceWrites[res.Name] = struct{}{}
 			} else {
 				resourceReads[res.Name] = struct{}{}

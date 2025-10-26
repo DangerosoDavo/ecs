@@ -373,6 +373,15 @@ Run with race detection (requires CGO):
 CGO_ENABLED=1 go test -race ./...
 ```
 
+Run inside Docker (portable CGO toolchain, override image via `ECS_GO_IMAGE`; defaults to `golang:1.25.3-alpine3.22`):
+```bash
+./scripts/test-in-docker.sh
+```
+Forward extra flags to `go test` as needed:
+```bash
+./scripts/test-in-docker.sh -run TestScheduler
+```
+
 Run with coverage:
 ```bash
 go test -cover ./...

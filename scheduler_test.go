@@ -151,9 +151,18 @@ func TestSchedulerRunsAsyncGroup(t *testing.T) {
 		t.Fatalf("configure async workers: %v", err)
 	}
 
-	order := make([]string, 0)
-	asyncSys := &testSystem{name: "async", executed: &order, desc: ecs.SystemDescriptor{AsyncAllowed: true}}
-	syncSys := &testSystem{name: "sync", executed: &order}
+	var mu sync.Mutex
+	executed := make(map[string]bool, 2)
+	record := func(name string) func(ctx ecs.ExecutionContext) {
+		return func(ctx ecs.ExecutionContext) {
+			mu.Lock()
+			executed[name] = true
+			mu.Unlock()
+		}
+	}
+
+	asyncSys := &testSystem{name: "async", desc: ecs.SystemDescriptor{AsyncAllowed: true}, deferCmd: record("async")}
+	syncSys := &testSystem{name: "sync", deferCmd: record("sync")}
 
 	asyncGroup := ecs.WorkGroupConfig{ID: "async", Mode: ecs.WorkGroupModeAsync, Systems: []ecs.System{asyncSys}}
 	syncGroup := ecs.WorkGroupConfig{ID: "sync", Mode: ecs.WorkGroupModeSynchronized, Systems: []ecs.System{syncSys}}
@@ -169,21 +178,13 @@ func TestSchedulerRunsAsyncGroup(t *testing.T) {
 		t.Fatalf("tick: %v", err)
 	}
 
-	if len(order) != 2 {
-		t.Fatalf("expected two systems to run, got %d", len(order))
-	}
-	foundAsync := false
-	foundSync := false
-	for _, name := range order {
-		switch name {
-		case "async":
-			foundAsync = true
-		case "sync":
-			foundSync = true
-		}
-	}
-	if !foundAsync || !foundSync {
-		t.Fatalf("expected both async and sync systems to execute: %#v", order)
+	mu.Lock()
+	asyncRan := executed["async"]
+	syncRan := executed["sync"]
+	mu.Unlock()
+
+	if !asyncRan || !syncRan {
+		t.Fatalf("expected both async and sync systems to execute: %#v", executed)
 	}
 }
 
@@ -265,6 +266,39 @@ func TestSchedulerRejectsConflictingWritersAcrossGroups(t *testing.T) {
 		t.Fatalf("expected conflict when registering second writer")
 	} else if !errors.Is(err, ecs.ErrDuplicateWriteAccess) {
 		t.Fatalf("expected ErrDuplicateWriteAccess, got %v", err)
+	}
+}
+
+func TestSchedulerAllowsMultipleWritersWithinSynchronousGroup(t *testing.T) {
+	world := ecs.NewWorld()
+	scheduler, err := ecs.NewScheduler(world)
+	if err != nil {
+		t.Fatalf("new scheduler: %v", err)
+	}
+
+	order := make([]string, 0, 2)
+	writerA := &testSystem{name: "writerA", desc: ecs.SystemDescriptor{Writes: []ecs.ComponentType{"comp"}}, executed: &order}
+	writerB := &testSystem{name: "writerB", desc: ecs.SystemDescriptor{Writes: []ecs.ComponentType{"comp"}}, executed: &order}
+
+	group := ecs.WorkGroupConfig{
+		ID:     "writers",
+		Mode:   ecs.WorkGroupModeSynchronized,
+		Systems: []ecs.System{
+			writerA,
+			writerB,
+		},
+	}
+
+	if _, err := scheduler.RegisterWorkGroup(group); err != nil {
+		t.Fatalf("register writers group: %v", err)
+	}
+
+	if err := scheduler.Tick(context.Background(), time.Millisecond); err != nil {
+		t.Fatalf("tick: %v", err)
+	}
+
+	if len(order) != 2 || order[0] != "writerA" || order[1] != "writerB" {
+		t.Fatalf("expected writerA and writerB to run sequentially, got %#v", order)
 	}
 }
 
