@@ -14,7 +14,7 @@
 - First-class tooling for profiling, tracing, and automated testing.
 
 ## Core Concepts
-- **EntityID**: Numeric identifier managed by `EntityRegistry`; reused via generation counters to avoid stale references.
+- **EntityID**: Numeric identifier managed by `EntityRegistry`; reused via generation counters to avoid stale references. Registries support explicit restoration via `CreateWithID` for persisted entity IDs.
 - **Component Storage**: Pluggable storage backends (dense slice, sparse map, archetype chunk) managed by `World`.
 - **System**: Go interface with `Run(ctx ExecutionContext)` and metadata describing component access (read/write), frequency, and async eligibility.
 - **WorkGroup**: Logical collection of systems plus configuration (mode, priority, interval, error policy).

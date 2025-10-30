@@ -72,6 +72,56 @@ func (r *EntityRegistry) Create() EntityID {
 	return EntityID{index: index, generation: generation}
 }
 
+// CreateWithID allocates a specific entity identifier, enabling state restoration.
+// The supplied identifier must be non-zero and refer to an unused or free slot.
+func (r *EntityRegistry) CreateWithID(id EntityID) error {
+	if id.IsZero() {
+		return fmt.Errorf("ecs: cannot restore zero entity")
+	}
+	if id.Generation() == 0 {
+		return fmt.Errorf("ecs: cannot restore entity with zero generation")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	idx := id.Index()
+	gen := id.Generation()
+
+	for idx >= uint32(len(r.generations)) {
+		r.generations = append(r.generations, 0)
+	}
+
+	currentGen := r.generations[idx]
+
+	freeIdx := -1
+	for i, candidate := range r.free {
+		if candidate == idx {
+			freeIdx = i
+			break
+		}
+	}
+	slotFree := freeIdx >= 0
+
+	if currentGen != 0 && !slotFree {
+		if currentGen == gen {
+			return fmt.Errorf("ecs: entity %d:%d already allocated", idx, gen)
+		}
+		return fmt.Errorf("ecs: entity slot %d in use (generation %d, requested %d)", idx, currentGen, gen)
+	}
+
+	if currentGen != 0 && slotFree && gen < currentGen {
+		return fmt.Errorf("ecs: cannot restore entity slot %d with stale generation %d (current %d)", idx, gen, currentGen)
+	}
+
+	r.generations[idx] = gen
+	if slotFree {
+		r.free = append(r.free[:freeIdx], r.free[freeIdx+1:]...)
+	}
+	r.alive++
+	return nil
+}
+
 // Destroy releases the entity identifier, returning true when successful.
 func (r *EntityRegistry) Destroy(id EntityID) bool {
 	if id.IsZero() {

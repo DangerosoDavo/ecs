@@ -55,3 +55,45 @@ func TestEntityRegistryRejectsStaleId(t *testing.T) {
 		t.Fatalf("stale id should not be alive")
 	}
 }
+
+func TestEntityRegistryCreateWithID(t *testing.T) {
+	reg := ecs.NewEntityRegistry()
+
+	targetID := ecs.EntityIDFromParts(100, 5)
+	if err := reg.CreateWithID(targetID); err != nil {
+		t.Fatalf("CreateWithID: %v", err)
+	}
+	if !reg.IsAlive(targetID) {
+		t.Fatalf("expected restored entity to be alive")
+	}
+
+	if err := reg.CreateWithID(targetID); err == nil {
+		t.Fatalf("expected duplicate CreateWithID to fail")
+	}
+
+	if !reg.Destroy(targetID) {
+		t.Fatalf("expected destroy to succeed")
+	}
+
+	nextGenID := ecs.EntityIDFromParts(100, 6)
+	if err := reg.CreateWithID(nextGenID); err != nil {
+		t.Fatalf("CreateWithID next generation: %v", err)
+	}
+	if !reg.IsAlive(nextGenID) {
+		t.Fatalf("expected next generation entity to be alive")
+	}
+
+	staleID := ecs.EntityIDFromParts(100, 5)
+	if err := reg.CreateWithID(staleID); err == nil {
+		t.Fatalf("expected stale generation to be rejected")
+	}
+
+	if err := reg.CreateWithID(ecs.EntityID{}); err == nil {
+		t.Fatalf("expected zero entity rejection")
+	}
+
+	normal := reg.Create()
+	if normal.Index() == targetID.Index() {
+		t.Fatalf("expected normal Create to allocate different slot")
+	}
+}

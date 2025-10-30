@@ -11,6 +11,7 @@
 # Go tooling
 *.test
 *.cover
+.cache/
 
 # Trace/pprof artifacts
 *.trace

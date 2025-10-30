@@ -1,7 +1,0 @@
-./api.go
-./doc.go
-./entity.go
-./errors.go
-./resource_container.go
-./storage_provider.go
-./world.go

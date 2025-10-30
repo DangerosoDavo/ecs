@@ -64,3 +64,25 @@ func TestAddRemoveComponentCommands(t *testing.T) {
 		t.Fatalf("component should be removed")
 	}
 }
+
+func TestRestoreEntityCommand(t *testing.T) {
+	world := ecs.NewWorld()
+	id := ecs.EntityIDFromParts(42, 7)
+	cmd := ecs.NewRestoreEntityCommand(id)
+
+	if err := cmd.Apply(world); err != nil {
+		t.Fatalf("apply restore: %v", err)
+	}
+	if !world.Registry().IsAlive(id) {
+		t.Fatalf("expected restored entity to exist")
+	}
+
+	if err := cmd.Apply(world); err == nil {
+		t.Fatalf("expected duplicate restore to fail")
+	}
+
+	zero := ecs.NewRestoreEntityCommand(ecs.EntityID{})
+	if err := zero.Apply(world); err == nil {
+		t.Fatalf("expected zero restore to fail")
+	}
+}

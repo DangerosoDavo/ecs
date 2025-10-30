@@ -22,6 +22,11 @@ func NewRemoveComponentCommand(id EntityID, component ComponentType) Command {
 	return removeComponentCommand{entity: id, component: component}
 }
 
+// NewRestoreEntityCommand enqueues restoration of a specific entity identifier.
+func NewRestoreEntityCommand(id EntityID) Command {
+	return restoreEntityCommand{id: id}
+}
+
 type createEntityCommand struct {
 	target *EntityID
 }
@@ -39,6 +44,10 @@ type addComponentCommand struct {
 type removeComponentCommand struct {
 	entity    EntityID
 	component ComponentType
+}
+
+type restoreEntityCommand struct {
+	id EntityID
 }
 
 func (c createEntityCommand) Apply(world *World) error {
@@ -90,9 +99,17 @@ func (c removeComponentCommand) Apply(world *World) error {
 	return nil
 }
 
+func (c restoreEntityCommand) Apply(world *World) error {
+	if c.id.IsZero() {
+		return fmt.Errorf("ecs: restore zero entity")
+	}
+	return world.registry.CreateWithID(c.id)
+}
+
 var (
 	_ Command = createEntityCommand{}
 	_ Command = destroyEntityCommand{}
 	_ Command = addComponentCommand{}
 	_ Command = removeComponentCommand{}
+	_ Command = restoreEntityCommand{}
 )
