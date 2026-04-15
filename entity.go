@@ -159,6 +159,17 @@ func (r *EntityRegistry) Count() int {
 	return int(r.alive)
 }
 
+// GenerationOf returns the current generation stored in the registry for the
+// given index. Useful for diagnostics when IsAlive fails.
+func (r *EntityRegistry) GenerationOf(index uint32) uint32 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if index >= uint32(len(r.generations)) {
+		return 0
+	}
+	return r.generations[index]
+}
+
 func (r *EntityRegistry) isAliveLocked(id EntityID) bool {
 	idx := id.index
 	if idx >= uint32(len(r.generations)) {
