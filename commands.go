@@ -62,6 +62,10 @@ func (c destroyEntityCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: destroy zero entity")
 	}
+	// Remove all component data before freeing the registry slot.
+	// Must happen first while the entity is still alive so generation-matched
+	// Remove calls succeed in component stores.
+	world.storage.RemoveEntity(c.entity)
 	if !world.registry.Destroy(c.entity) {
 		return fmt.Errorf("ecs: destroy stale entity %v", c.entity)
 	}

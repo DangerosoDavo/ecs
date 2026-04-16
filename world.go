@@ -67,6 +67,14 @@ func (w *World) ViewComponent(t ComponentType) (ComponentView, error) {
     return w.storage.View(t)
 }
 
+// DestroyEntity removes all component data for the entity and then frees its
+// registry slot. Prefer this over calling Registry().Destroy() directly to
+// ensure component stores are cleaned up.
+func (w *World) DestroyEntity(id EntityID) bool {
+    w.storage.RemoveEntity(id)
+    return w.registry.Destroy(id)
+}
+
 // ApplyCommands executes deferred commands against the world.
 func (w *World) ApplyCommands(commands []Command) error {
     return w.storage.Apply(w, commands)

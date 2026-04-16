@@ -14,6 +14,7 @@ A production-ready Entity-Component-System (ECS) scheduler for Go gameserver wor
 - **Component Storage**: Pluggable storage strategies (Dense, Shared) with type-safe component access
 - **System Execution**: Deterministic work group ordering with resource conflict detection
 - **Command Pipeline**: Deferred mutation system for safe entity/component modifications during system execution
+- **Entity Lifecycle**: Destroying an entity automatically removes all its component data from stores — no manual cleanup required
 - **Resource Management**: Shared resource container with read/write access control
 
 ### Scheduler Capabilities
@@ -259,6 +260,27 @@ func main() {
 }
 ```
 
+### Entity Destruction
+
+Destroying an entity automatically removes all its component data from every registered store. This prevents stale component data from leaking in stores and being iterated by systems.
+
+```go
+// Via command (inside systems, deferred)
+exec.Defer(ecs.NewDestroyEntityCommand(entityID))
+
+// Via World method (immediate, outside system execution)
+world.DestroyEntity(entityID)
+```
+
+Both paths clean up components before freeing the registry slot. `World.DestroyEntity()` is preferred over calling `Registry().Destroy()` directly, which only frees the registry slot without cleaning up components.
+
+You can also inspect which components an entity has:
+
+```go
+types := world.Storage().ComponentsFor(entityID)
+// Returns: []ComponentType{"Position", "Health", "Velocity"}
+```
+
 ## Repository Layout
 
 ```
@@ -348,7 +370,7 @@ Leverage shared components for memory efficiency:
 
 | Operation | Complexity | Notes |
 |-----------|-----------|-------|
-| Entity Create/Destroy | O(1) | Generation tracking prevents stale handles |
+| Entity Create/Destroy | O(c) | c = registered component types; removes all components then frees slot |
 | Component Get (Dense) | O(1) | Direct array indexing |
 | Component Get (Shared) | O(1) | Hash map lookup |
 | Component Set (Dense) | O(1) | Direct write |

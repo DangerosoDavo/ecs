@@ -180,6 +180,13 @@ type StorageProvider interface {
 	RegisterComponent(ComponentType, StorageStrategy) error
 	View(ComponentType) (ComponentView, error)
 	Apply(*World, []Command) error
+	// RemoveEntity removes all component data for the given entity across every
+	// registered store. Called automatically by DestroyEntityCommand before the
+	// registry slot is freed.
+	RemoveEntity(EntityID)
+	// ComponentsFor returns the component types that the entity currently has
+	// data in. Useful for debugging and inspection.
+	ComponentsFor(EntityID) []ComponentType
 }
 
 // StorageStrategy describes how a component type is stored internally.

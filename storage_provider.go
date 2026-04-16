@@ -56,4 +56,24 @@ func (p *storageProvider) Apply(world *World, commands []Command) error {
 	return nil
 }
 
+func (p *storageProvider) RemoveEntity(id EntityID) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	for _, store := range p.stores {
+		store.Remove(id)
+	}
+}
+
+func (p *storageProvider) ComponentsFor(id EntityID) []ComponentType {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	var types []ComponentType
+	for _, store := range p.stores {
+		if store.Has(id) {
+			types = append(types, store.ComponentType())
+		}
+	}
+	return types
+}
+
 var _ StorageProvider = (*storageProvider)(nil)
