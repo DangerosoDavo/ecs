@@ -173,6 +173,7 @@ type World struct {
 	registry  *EntityRegistry
 	storage   StorageProvider
 	resources ResourceContainer
+	changed   map[EntityID]bool // entity-level dirty set for change tracking
 }
 
 // StorageProvider manages component storage backends.

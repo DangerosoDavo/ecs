@@ -8,6 +8,7 @@ func NewWorld(opts ...WorldOption) *World {
 		registry:  NewEntityRegistry(),
 		storage:   newStorageProvider(),
 		resources: newResourceContainer(),
+		changed:   make(map[EntityID]bool),
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -78,4 +79,29 @@ func (w *World) DestroyEntity(id EntityID) bool {
 // ApplyCommands executes deferred commands against the world.
 func (w *World) ApplyCommands(commands []Command) error {
     return w.storage.Apply(w, commands)
+}
+
+// MarkChanged flags an entity as modified this tick. Systems should call this
+// after mutating a component through a pointer obtained via Get(). Commands
+// (AddComponent, RemoveComponent) call this automatically.
+func (w *World) MarkChanged(id EntityID) {
+	w.changed[id] = true
+}
+
+// Changed returns the current dirty set without clearing it.
+func (w *World) Changed() map[EntityID]bool {
+	return w.changed
+}
+
+// DrainChanged returns the current dirty set and resets it. Designed for
+// consumers like a sync system that process changes once per tick.
+func (w *World) DrainChanged() map[EntityID]bool {
+	c := w.changed
+	w.changed = make(map[EntityID]bool)
+	return c
+}
+
+// ClearChanged resets the dirty set without returning it.
+func (w *World) ClearChanged() {
+	w.changed = make(map[EntityID]bool)
 }

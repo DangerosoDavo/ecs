@@ -84,6 +84,7 @@ func (c addComponentCommand) Apply(world *World) error {
 	if !ok {
 		return fmt.Errorf("ecs: component %s is not writable", c.component)
 	}
+	world.MarkChanged(c.entity)
 	return writable.Set(c.entity, c.value)
 }
 
@@ -99,6 +100,7 @@ func (c removeComponentCommand) Apply(world *World) error {
 	if !ok {
 		return fmt.Errorf("ecs: component %s is not writable", c.component)
 	}
+	world.MarkChanged(c.entity)
 	writable.Remove(c.entity)
 	return nil
 }

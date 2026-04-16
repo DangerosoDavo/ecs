@@ -15,6 +15,7 @@ A production-ready Entity-Component-System (ECS) scheduler for Go gameserver wor
 - **System Execution**: Deterministic work group ordering with resource conflict detection
 - **Command Pipeline**: Deferred mutation system for safe entity/component modifications during system execution
 - **Entity Lifecycle**: Destroying an entity automatically removes all its component data from stores — no manual cleanup required
+- **Change Tracking**: Entity-level dirty set for efficient sync — commands auto-mark, systems can mark explicitly
 - **Resource Management**: Shared resource container with read/write access control
 
 ### Scheduler Capabilities
@@ -281,6 +282,56 @@ types := world.Storage().ComponentsFor(entityID)
 // Returns: []ComponentType{"Position", "Health", "Velocity"}
 ```
 
+### Change Tracking
+
+The World maintains an entity-level dirty set for tracking which entities have been modified. This enables consumers like network sync systems to skip unchanged entities instead of diffing every entity every tick.
+
+**Automatic tracking** — `AddComponentCommand` and `RemoveComponentCommand` mark the entity as changed when applied:
+
+```go
+// These automatically call world.MarkChanged(entityID) internally
+exec.Defer(ecs.NewAddComponentCommand(entityID, "Health", health))
+exec.Defer(ecs.NewRemoveComponentCommand(entityID, "Shield"))
+```
+
+**Manual tracking** — systems that mutate components via pointer (obtained from `Get()`) should mark explicitly:
+
+```go
+func (s *RegenSystem) Run(ctx context.Context, exec ecs.ExecutionContext) ecs.SystemResult {
+    world := exec.World()
+    view, _ := world.ViewComponent("Health")
+
+    view.Iterate(func(id ecs.EntityID, val any) bool {
+        health := val.(*Health)
+        if health.Current < health.Max {
+            health.Current += health.RegenRate
+            world.MarkChanged(id) // flag for sync
+        }
+        return true
+    })
+
+    return ecs.SystemResult{}
+}
+```
+
+**Consuming changes** — `DrainChanged()` returns and clears the dirty set, designed for once-per-tick consumers:
+
+```go
+func (s *SyncSystem) Run(ctx context.Context, exec ecs.ExecutionContext) ecs.SystemResult {
+    dirty := exec.World().DrainChanged()
+
+    for entityID := range dirty {
+        // Only rebuild/send state for entities that actually changed
+    }
+
+    return ecs.SystemResult{}
+}
+```
+
+Other utilities:
+- `world.Changed()` — read the dirty set without clearing
+- `world.ClearChanged()` — reset without reading
+
 ## Repository Layout
 
 ```
@@ -376,7 +427,9 @@ Leverage shared components for memory efficiency:
 | Component Set (Dense) | O(1) | Direct write |
 | Component Set (Shared) | O(n) | Deep equality check (n = unique values) |
 | System Execution | O(entities) | Iterate all entities with component |
-| Command Application | O(commands) | Sequential command processing |
+| MarkChanged | O(1) | Map write |
+| DrainChanged | O(1) | Map swap |
+| Command Application | O(commands) | Sequential command processing; auto-marks changed entities |
 
 **Shared Storage Performance:**
 - Best for: High entity count (1000+), low unique values (10-100)
@@ -427,6 +480,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - ✅ Comprehensive test suite with race detection
 - ✅ Resource access validation
 - ✅ Command pipeline for safe mutations
+- ✅ Entity-level change tracking for efficient sync
 - 🚧 Benchmarking suite (planned)
 - 🚧 Additional storage strategies (planned: Sparse, Hierarchical)
 
