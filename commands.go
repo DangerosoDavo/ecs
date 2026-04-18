@@ -27,6 +27,30 @@ func NewRestoreEntityCommand(id EntityID) Command {
 	return restoreEntityCommand{id: id}
 }
 
+// NewDisableComponentCommand enqueues disabling a single component on an entity.
+// Systems iterating the affected component type will skip the entity until it
+// is re-enabled. Fails if the component type is non-disableable.
+func NewDisableComponentCommand(id EntityID, component ComponentType) Command {
+	return disableComponentCommand{entity: id, component: component}
+}
+
+// NewEnableComponentCommand enqueues re-enabling a single component on an entity.
+func NewEnableComponentCommand(id EntityID, component ComponentType) Command {
+	return enableComponentCommand{entity: id, component: component}
+}
+
+// NewDisableEntityCommand enqueues disabling every disableable component on
+// the entity in a single step. Non-disableable types are left untouched.
+func NewDisableEntityCommand(id EntityID) Command {
+	return disableEntityCommand{entity: id}
+}
+
+// NewEnableEntityCommand enqueues re-enabling every disabled component on the
+// entity.
+func NewEnableEntityCommand(id EntityID) Command {
+	return enableEntityCommand{entity: id}
+}
+
 type createEntityCommand struct {
 	target *EntityID
 }
@@ -48,6 +72,24 @@ type removeComponentCommand struct {
 
 type restoreEntityCommand struct {
 	id EntityID
+}
+
+type disableComponentCommand struct {
+	entity    EntityID
+	component ComponentType
+}
+
+type enableComponentCommand struct {
+	entity    EntityID
+	component ComponentType
+}
+
+type disableEntityCommand struct {
+	entity EntityID
+}
+
+type enableEntityCommand struct {
+	entity EntityID
 }
 
 func (c createEntityCommand) Apply(world *World) error {
@@ -112,10 +154,45 @@ func (c restoreEntityCommand) Apply(world *World) error {
 	return world.registry.CreateWithID(c.id)
 }
 
+func (c disableComponentCommand) Apply(world *World) error {
+	if c.entity.IsZero() {
+		return fmt.Errorf("ecs: disable component on zero entity")
+	}
+	return world.DisableComponent(c.entity, c.component)
+}
+
+func (c enableComponentCommand) Apply(world *World) error {
+	if c.entity.IsZero() {
+		return fmt.Errorf("ecs: enable component on zero entity")
+	}
+	world.EnableComponent(c.entity, c.component)
+	return nil
+}
+
+func (c disableEntityCommand) Apply(world *World) error {
+	if c.entity.IsZero() {
+		return fmt.Errorf("ecs: disable zero entity")
+	}
+	world.DisableEntity(c.entity)
+	return nil
+}
+
+func (c enableEntityCommand) Apply(world *World) error {
+	if c.entity.IsZero() {
+		return fmt.Errorf("ecs: enable zero entity")
+	}
+	world.EnableEntity(c.entity)
+	return nil
+}
+
 var (
 	_ Command = createEntityCommand{}
 	_ Command = destroyEntityCommand{}
 	_ Command = addComponentCommand{}
 	_ Command = removeComponentCommand{}
 	_ Command = restoreEntityCommand{}
+	_ Command = disableComponentCommand{}
+	_ Command = enableComponentCommand{}
+	_ Command = disableEntityCommand{}
+	_ Command = enableEntityCommand{}
 )

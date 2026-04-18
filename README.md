@@ -16,6 +16,7 @@ A production-ready Entity-Component-System (ECS) scheduler for Go gameserver wor
 - **Command Pipeline**: Deferred mutation system for safe entity/component modifications during system execution
 - **Entity Lifecycle**: Destroying an entity automatically removes all its component data from stores — no manual cleanup required
 - **Change Tracking**: Entity-level dirty set for efficient sync — commands auto-mark, systems can mark explicitly
+- **Component Disable/Enable**: Hide components from system iteration without removing their data — pause an entity's behavior, then resume cleanly
 - **Resource Management**: Shared resource container with read/write access control
 
 ### Scheduler Capabilities
@@ -332,6 +333,66 @@ Other utilities:
 - `world.Changed()` — read the dirty set without clearing
 - `world.ClearChanged()` — reset without reading
 
+### Component Disable/Enable
+
+Some workflows need to temporarily pause an entity's behavior without destroying
+and recreating it — e.g. a building under construction should not grant vision
+or produce resources until the build finishes, but its position, owner, and
+construction progress must remain intact.
+
+Any component can be disabled on an entity. Disabled components are **skipped
+by `Iterate`** (so systems naturally stop touching them), while **`Get`/`Has`/`Len`
+pass through** to the underlying store so callers that explicitly need to inspect
+paused data (e.g. reading reserved cargo) still can.
+
+**Register a component as non-disableable** — useful for core identity data that
+must always remain visible:
+
+```go
+world.RegisterComponent("Position", ecsstorage.NewDenseStrategy(), ecs.WithNonDisableable())
+world.RegisterComponent("Owner",    ecsstorage.NewDenseStrategy(), ecs.WithNonDisableable())
+world.RegisterComponent("Cargo",    ecsstorage.NewDenseStrategy()) // disableable
+world.RegisterComponent("Vision",   ecsstorage.NewDenseStrategy()) // disableable
+```
+
+`DisableComponent` on a non-disableable type returns `ecs.ErrComponentNonDisableable`,
+and `DisableEntity` silently skips such types.
+
+**Direct API** — immediate application, safe to call outside system execution:
+
+```go
+// Disable a single component
+if err := world.DisableComponent(entityID, "Vision"); err != nil { /* non-disableable */ }
+
+// Re-enable
+world.EnableComponent(entityID, "Vision")
+
+// Disable every disableable component on the entity in one call. Returns the
+// list of types that were newly disabled.
+disabled := world.DisableEntity(entityID)
+
+// Re-enable every disabled component on the entity.
+world.EnableEntity(entityID)
+
+// Inspection
+if world.IsComponentDisabled(entityID, "Vision") { /* ... */ }
+types := world.DisabledComponents(entityID) // snapshot
+```
+
+**Deferred API** — use inside systems via `exec.Defer` for safe ordering:
+
+```go
+exec.Defer(ecs.NewDisableComponentCommand(entityID, "Vision"))
+exec.Defer(ecs.NewEnableComponentCommand(entityID, "Vision"))
+exec.Defer(ecs.NewDisableEntityCommand(entityID))
+exec.Defer(ecs.NewEnableEntityCommand(entityID))
+```
+
+**Lifecycle integration**:
+- Disable/Enable operations mark the entity as changed so sync systems see the
+  state transition.
+- `DestroyEntity` clears any disabled state for the entity automatically.
+
 ## Repository Layout
 
 ```
@@ -481,6 +542,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - ✅ Resource access validation
 - ✅ Command pipeline for safe mutations
 - ✅ Entity-level change tracking for efficient sync
+- ✅ Component disable/enable for pausing entity behavior
 - 🚧 Benchmarking suite (planned)
 - 🚧 Additional storage strategies (planned: Sparse, Hierarchical)
 

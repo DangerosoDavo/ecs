@@ -3,6 +3,7 @@ package ecs
 import (
 	"context"
 	"io"
+	"sync"
 	"time"
 )
 
@@ -170,10 +171,13 @@ type ExecutionContext interface {
 
 // World encapsulates entity/component storage and resources.
 type World struct {
-	registry  *EntityRegistry
-	storage   StorageProvider
-	resources ResourceContainer
-	changed   map[EntityID]bool // entity-level dirty set for change tracking
+	registry      *EntityRegistry
+	storage       StorageProvider
+	resources     ResourceContainer
+	changed       map[EntityID]bool // entity-level dirty set for change tracking
+	mu            sync.RWMutex
+	disabled      map[EntityID]map[ComponentType]bool
+	componentCfgs map[ComponentType]ComponentConfig
 }
 
 // StorageProvider manages component storage backends.
@@ -188,6 +192,23 @@ type StorageProvider interface {
 	// ComponentsFor returns the component types that the entity currently has
 	// data in. Useful for debugging and inspection.
 	ComponentsFor(EntityID) []ComponentType
+}
+
+// ComponentOption configures component registration behavior.
+type ComponentOption func(*ComponentConfig)
+
+// ComponentConfig holds resolved options for a registered component type.
+type ComponentConfig struct {
+	NonDisableable bool
+}
+
+// WithNonDisableable marks a component type as always-on. DisableComponent and
+// DisableEntity will skip (or error, depending on call) such types, ensuring
+// core identity data like Position or Owner is never hidden from systems.
+func WithNonDisableable() ComponentOption {
+	return func(c *ComponentConfig) {
+		c.NonDisableable = true
+	}
 }
 
 // StorageStrategy describes how a component type is stored internally.
