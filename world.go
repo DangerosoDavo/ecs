@@ -124,18 +124,35 @@ func (w *World) ApplyCommands(commands []Command) error {
 // MarkChanged flags an entity as modified this tick. Systems should call this
 // after mutating a component through a pointer obtained via Get(). Commands
 // (AddComponent, RemoveComponent) call this automatically.
+//
+// Takes the world mutex because ApplyCommands runs on whichever goroutine
+// called it — the game tick loop AND async command workers both route
+// writes through this path, and concurrent access to a plain map is an
+// immediate fatal ("concurrent map writes" panic from the runtime).
 func (w *World) MarkChanged(id EntityID) {
+	w.mu.Lock()
 	w.changed[id] = true
+	w.mu.Unlock()
 }
 
-// Changed returns the current dirty set without clearing it.
+// Changed returns a snapshot copy of the current dirty set without clearing
+// it. The copy lets callers iterate safely while other goroutines continue
+// to mark entities changed.
 func (w *World) Changed() map[EntityID]bool {
-	return w.changed
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	snap := make(map[EntityID]bool, len(w.changed))
+	for k, v := range w.changed {
+		snap[k] = v
+	}
+	return snap
 }
 
 // DrainChanged returns the current dirty set and resets it. Designed for
 // consumers like a sync system that process changes once per tick.
 func (w *World) DrainChanged() map[EntityID]bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	c := w.changed
 	w.changed = make(map[EntityID]bool)
 	return c
@@ -143,7 +160,9 @@ func (w *World) DrainChanged() map[EntityID]bool {
 
 // ClearChanged resets the dirty set without returning it.
 func (w *World) ClearChanged() {
+	w.mu.Lock()
 	w.changed = make(map[EntityID]bool)
+	w.mu.Unlock()
 }
 
 // --- Component disable/enable -----------------------------------------------
