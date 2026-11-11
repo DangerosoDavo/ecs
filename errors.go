@@ -3,6 +3,12 @@ package ecs
 import "errors"
 
 var (
+	ErrStaleEntity          = errors.New("ecs: stale or unallocated entity")
+	ErrComponentNotPresent  = errors.New("ecs: component not present on entity")
+	ErrReadOnlyExecution    = errors.New("ecs: async execution cannot defer mutations")
+	ErrConcurrentTick       = errors.New("ecs: concurrent or recursive tick")
+	ErrChangeHistoryExpired = errors.New("ecs: change history expired; full resync required")
+	ErrUnsupportedSnapshot  = errors.New("ecs: value requires SnapshotCloner for async execution")
 	// ErrComponentAlreadyRegistered indicates an attempt to register the same component twice.
 	ErrComponentAlreadyRegistered = errors.New("ecs: component already registered")
 	// ErrComponentNotRegistered signals lookup on an unknown component type.

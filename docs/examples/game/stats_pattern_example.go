@@ -57,8 +57,7 @@ func ExampleStatsPattern() {
 	// Spawn 100 zombies - they all SHARE the same BaseStats instance
 	fmt.Println("Creating 100 zombies with shared base stats...")
 	for i := 0; i < 100; i++ {
-		var zombieID ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&zombieID))
+		zombieID := world.Registry().Create()
 
 		// BaseStats is SHARED across all zombies (memory efficient!)
 		cmds.Push(ecs.NewAddComponentCommand(zombieID, "BaseStats", ZombieBaseStats))
@@ -79,8 +78,7 @@ func ExampleStatsPattern() {
 	// Spawn 50 skeletons
 	fmt.Println("Creating 50 skeletons with shared base stats...")
 	for i := 0; i < 50; i++ {
-		var skeletonID ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&skeletonID))
+		skeletonID := world.Registry().Create()
 
 		cmds.Push(ecs.NewAddComponentCommand(skeletonID, "BaseStats", SkeletonBaseStats))
 		cmds.Push(ecs.NewAddComponentCommand(skeletonID, "CurrentStats", CurrentStats{
@@ -95,8 +93,8 @@ func ExampleStatsPattern() {
 
 	// Spawn 1 boss
 	fmt.Println("Creating 1 boss with unique base stats...")
-	var bossID ecs.EntityID
-	cmds.Push(ecs.NewCreateEntityCommand(&bossID))
+	bossID := world.Registry().Create()
+
 	cmds.Push(ecs.NewAddComponentCommand(bossID, "BaseStats", BossBaseStats))
 	cmds.Push(ecs.NewAddComponentCommand(bossID, "CurrentStats", CurrentStats{
 		CurrentHealth: BossBaseStats.MaxHealth,
@@ -111,7 +109,7 @@ func ExampleStatsPattern() {
 	fmt.Println("- 151 entities created")
 	fmt.Println("- Only 3 unique BaseStats instances in memory (Zombie, Skeleton, Boss)")
 	fmt.Println("- 151 unique CurrentStats instances (one per entity)")
-	fmt.Println("- Memory savings: ~98% for BaseStats compared to dense storage")
+	fmt.Println("- Definition payloads are shared; profile total storage overhead separately")
 
 	// Now let's damage some zombies individually
 	fmt.Println("\n=== Damaging Individual Zombies ===")
@@ -236,10 +234,9 @@ func ExampleUpgradingEntityArchetype() {
 	world.RegisterComponent("CurrentStats", ecsstorage.NewDenseStrategy())
 
 	// Create a zombie
-	var zombieID ecs.EntityID
+	zombieID := world.Registry().Create()
 	cmds := ecs.NewCommandBuffer()
 
-	cmds.Push(ecs.NewCreateEntityCommand(&zombieID))
 	cmds.Push(ecs.NewAddComponentCommand(zombieID, "BaseStats", ZombieBaseStats))
 	cmds.Push(ecs.NewAddComponentCommand(zombieID, "CurrentStats", CurrentStats{
 		CurrentHealth: ZombieBaseStats.MaxHealth,
@@ -287,8 +284,8 @@ func ExampleSharedStatsVsDenseStats() {
 
 	cmds := ecs.NewCommandBuffer()
 	for i := 0; i < 1000; i++ {
-		var id ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&id))
+		id := worldDense.Registry().Create()
+
 		cmds.Push(ecs.NewAddComponentCommand(id, "BaseStats", ZombieBaseStats))
 	}
 	worldDense.ApplyCommands(cmds.Drain())
@@ -296,7 +293,7 @@ func ExampleSharedStatsVsDenseStats() {
 	fmt.Println("Dense Storage:")
 	fmt.Println("  Entities: 1000")
 	fmt.Println("  BaseStats instances in memory: 1000")
-	fmt.Println("  Approximate memory (40 bytes per struct): ~40 KB")
+	fmt.Println("  Payload counts exclude backing stores and allocator metadata")
 
 	// With Shared Storage
 	worldShared := ecs.NewWorld()
@@ -304,8 +301,8 @@ func ExampleSharedStatsVsDenseStats() {
 
 	cmds = ecs.NewCommandBuffer()
 	for i := 0; i < 1000; i++ {
-		var id ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&id))
+		id := worldShared.Registry().Create()
+
 		cmds.Push(ecs.NewAddComponentCommand(id, "BaseStats", ZombieBaseStats))
 	}
 	worldShared.ApplyCommands(cmds.Drain())
@@ -313,7 +310,7 @@ func ExampleSharedStatsVsDenseStats() {
 	fmt.Println("\nShared Storage:")
 	fmt.Println("  Entities: 1000")
 	fmt.Println("  BaseStats instances in memory: 1")
-	fmt.Println("  Reference map overhead: ~8 KB")
-	fmt.Println("  Total memory: ~8 KB")
-	fmt.Println("\n  Memory savings: ~80%")
+	fmt.Println("  Reference maps retain per-entity metadata")
+	fmt.Println("  Measure total allocations on your target workload")
+	fmt.Println("\n  Actual memory savings depend on payload size and storage overhead")
 }

@@ -1,0 +1,42 @@
+go version go1.27.4 windows/amd64
+goos: windows
+goarch: amd64
+pkg: github.com/DangerosoDavo/ecs
+cpu: Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz
+BenchmarkBitmapIteration/full_10000         	   19530	     19678 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/full_10000         	   18051	     20166 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/full_10000         	   19819	     18285 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/full_10000         	   20046	     18016 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/full_10000         	   19374	     18321 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/sparse_100_of_10000         	  965509	       327.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/sparse_100_of_10000         	 1000000	       303.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/sparse_100_of_10000         	 1268638	       287.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/sparse_100_of_10000         	 1000000	       428.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkBitmapIteration/sparse_100_of_10000         	 1000000	       417.4 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000                   	   21354	     14435 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000                   	   29838	     13635 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000                   	   27457	     11626 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000                   	   22786	     17842 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000                   	   28449	     11766 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000          	   36051	     10707 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000          	   32919	     11329 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000          	   34501	     12472 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000          	   29678	     11784 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000          	   29527	     13901 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                          	 1246593	       299.3 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                          	 1000000	       382.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                          	 1519978	       238.8 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                          	 1434954	       287.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                          	 1617585	       228.1 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSchedulerTick                               	  339846	      1042 ns/op	     256 B/op	       9 allocs/op
+BenchmarkSchedulerTick                               	  515744	      1235 ns/op	     256 B/op	       9 allocs/op
+BenchmarkSchedulerTick                               	  150717	      3809 ns/op	     256 B/op	       9 allocs/op
+BenchmarkSchedulerTick                               	  186802	      4506 ns/op	     256 B/op	       9 allocs/op
+BenchmarkSchedulerTick                               	  107107	      4421 ns/op	     256 B/op	       9 allocs/op
+BenchmarkAsyncRead1000                               	    1290	    291826 ns/op	   87184 B/op	      59 allocs/op
+BenchmarkAsyncRead1000                               	    1424	    229048 ns/op	   87185 B/op	      59 allocs/op
+BenchmarkAsyncRead1000                               	    1904	    258118 ns/op	   87185 B/op	      59 allocs/op
+BenchmarkAsyncRead1000                               	    1513	    232736 ns/op	   87185 B/op	      59 allocs/op
+BenchmarkAsyncRead1000                               	    1810	    224160 ns/op	   87185 B/op	      59 allocs/op
+PASS
+ok  	github.com/DangerosoDavo/ecs	19.570s

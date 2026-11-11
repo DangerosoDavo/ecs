@@ -94,6 +94,7 @@ type enableEntityCommand struct {
 
 func (c createEntityCommand) Apply(world *World) error {
 	id := world.registry.Create()
+	world.MarkChanged(id)
 	if c.target != nil {
 		*c.target = id
 	}
@@ -107,9 +108,8 @@ func (c destroyEntityCommand) Apply(world *World) error {
 	// Remove all component data before freeing the registry slot.
 	// Must happen first while the entity is still alive so generation-matched
 	// Remove calls succeed in component stores.
-	world.storage.RemoveEntity(c.entity)
-	if !world.registry.Destroy(c.entity) {
-		return fmt.Errorf("ecs: destroy stale entity %v", c.entity)
+	if !world.DestroyEntity(c.entity) {
+		return fmt.Errorf("%w: destroy %v", ErrStaleEntity, c.entity)
 	}
 	return nil
 }
@@ -118,6 +118,9 @@ func (c addComponentCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: add component to zero entity")
 	}
+	if !world.registry.IsAlive(c.entity) {
+		return ErrStaleEntity
+	}
 	store, err := world.storage.View(c.component)
 	if err != nil {
 		return err
@@ -126,14 +129,20 @@ func (c addComponentCommand) Apply(world *World) error {
 	if !ok {
 		return fmt.Errorf("ecs: component %s is not writable", c.component)
 	}
+	if err := writable.Set(c.entity, c.value); err != nil {
+		return err
+	}
 	world.MarkChanged(c.entity)
-	return writable.Set(c.entity, c.value)
+	return nil
 }
 
 func (c removeComponentCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: remove component from zero entity")
 	}
+	if !world.registry.IsAlive(c.entity) {
+		return ErrStaleEntity
+	}
 	store, err := world.storage.View(c.component)
 	if err != nil {
 		return err
@@ -142,8 +151,10 @@ func (c removeComponentCommand) Apply(world *World) error {
 	if !ok {
 		return fmt.Errorf("ecs: component %s is not writable", c.component)
 	}
-	world.MarkChanged(c.entity)
-	writable.Remove(c.entity)
+	if writable.Remove(c.entity) {
+		world.EnableComponent(c.entity, c.component)
+		world.MarkChanged(c.entity)
+	}
 	return nil
 }
 
@@ -151,7 +162,11 @@ func (c restoreEntityCommand) Apply(world *World) error {
 	if c.id.IsZero() {
 		return fmt.Errorf("ecs: restore zero entity")
 	}
-	return world.registry.CreateWithID(c.id)
+	if err := world.registry.CreateWithID(c.id); err != nil {
+		return err
+	}
+	world.MarkChanged(c.id)
+	return nil
 }
 
 func (c disableComponentCommand) Apply(world *World) error {
@@ -165,6 +180,9 @@ func (c enableComponentCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: enable component on zero entity")
 	}
+	if !world.registry.IsAlive(c.entity) {
+		return ErrStaleEntity
+	}
 	world.EnableComponent(c.entity, c.component)
 	return nil
 }
@@ -173,6 +191,9 @@ func (c disableEntityCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: disable zero entity")
 	}
+	if !world.registry.IsAlive(c.entity) {
+		return ErrStaleEntity
+	}
 	world.DisableEntity(c.entity)
 	return nil
 }
@@ -180,6 +201,9 @@ func (c disableEntityCommand) Apply(world *World) error {
 func (c enableEntityCommand) Apply(world *World) error {
 	if c.entity.IsZero() {
 		return fmt.Errorf("ecs: enable zero entity")
+	}
+	if !world.registry.IsAlive(c.entity) {
+		return ErrStaleEntity
 	}
 	world.EnableEntity(c.entity)
 	return nil

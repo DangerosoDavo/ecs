@@ -21,7 +21,7 @@ race:
 	$(GO) test -race $(PKGS)
 
 bench:
-	$(GO) test -bench=. $(PKGS)
+	$(GO) test -run '^$$' -bench=. -benchmem -count=3 $(PKGS)
 
 fmt:
 	$(GO) fmt $(PKGS)

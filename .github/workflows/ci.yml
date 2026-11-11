@@ -16,7 +16,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24.x'
+          go-version-file: go.mod
 
       - name: Cache build data
         uses: actions/cache@v4
@@ -39,8 +39,33 @@ jobs:
         env:
           GOCACHE: ${{ github.workspace }}/.cache/go-build
 
+      - name: Race detector
+        run: go test -race ./...
+        env:
+          CGO_ENABLED: '1'
+
+      - name: Enforce coverage target
+        run: >-
+          go tool cover -func=coverage.out |
+          awk '/^total:/ { value=$NF; sub(/%/, "", value); found=1; if (value <= 80) exit 1 } END { if (!found) exit 1 }'
+
+      - name: Lifecycle fuzz smoke
+        run: go test -run '^$' -fuzz '^FuzzEntityLifecycle$' -fuzztime=10s .
+
+      - name: Known reachable vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+      - name: Record benchmarks
+        run: go test -run '^$' -bench . -benchmem -count=3 ./... | tee benchmarks.txt
+
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage.out
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: benchmarks.txt

@@ -36,6 +36,7 @@ func NewScheduler(world *World) (Scheduler, error) {
 
 type basicScheduler struct {
 	mu                sync.RWMutex
+	tickMu            sync.Mutex
 	world             *World
 	groupStates       map[WorkGroupID]*workGroupState
 	registrationOrder []WorkGroupID
@@ -67,6 +68,7 @@ type workGroupState struct {
 	writeSet       map[ComponentType]struct{}
 	resourceReads  map[string]struct{}
 	resourceWrites map[string]struct{}
+	commandBarrier bool
 }
 
 type schedulerBuilder struct {
@@ -85,6 +87,8 @@ func (s *basicScheduler) Builder() SchedulerBuilder {
 }
 
 func (b *schedulerBuilder) WithSyncOrder(order []WorkGroupID) SchedulerBuilder {
+	b.scheduler.tickMu.Lock()
+	defer b.scheduler.tickMu.Unlock()
 	b.scheduler.mu.Lock()
 	b.scheduler.syncOrder = append([]WorkGroupID(nil), order...)
 	b.scheduler.rebuildOrder()
@@ -93,6 +97,8 @@ func (b *schedulerBuilder) WithSyncOrder(order []WorkGroupID) SchedulerBuilder {
 }
 
 func (b *schedulerBuilder) WithAsyncWorkers(count int) SchedulerBuilder {
+	b.scheduler.tickMu.Lock()
+	defer b.scheduler.tickMu.Unlock()
 	if count < 0 {
 		count = 0
 	}
@@ -110,6 +116,8 @@ func (b *schedulerBuilder) WithAsyncWorkers(count int) SchedulerBuilder {
 }
 
 func (b *schedulerBuilder) WithErrorPolicy(id WorkGroupID, policy ErrorPolicy) SchedulerBuilder {
+	b.scheduler.tickMu.Lock()
+	defer b.scheduler.tickMu.Unlock()
 	b.scheduler.mu.Lock()
 	if policy != 0 {
 		b.scheduler.errorPolicies[id] = policy
@@ -124,6 +132,8 @@ func (b *schedulerBuilder) WithErrorPolicy(id WorkGroupID, policy ErrorPolicy) S
 }
 
 func (b *schedulerBuilder) WithInstrumentation(cfg InstrumentationConfig) SchedulerBuilder {
+	b.scheduler.tickMu.Lock()
+	defer b.scheduler.tickMu.Unlock()
 	b.scheduler.mu.Lock()
 	b.scheduler.applyInstrumentation(cfg)
 	b.scheduler.mu.Unlock()
@@ -131,6 +141,8 @@ func (b *schedulerBuilder) WithInstrumentation(cfg InstrumentationConfig) Schedu
 }
 
 func (b *schedulerBuilder) Build(world *World) (Scheduler, error) {
+	b.scheduler.tickMu.Lock()
+	defer b.scheduler.tickMu.Unlock()
 	b.scheduler.mu.Lock()
 	defer b.scheduler.mu.Unlock()
 	if world != nil {
@@ -150,6 +162,8 @@ func (s *basicScheduler) applyInstrumentation(cfg InstrumentationConfig) {
 }
 
 func (s *basicScheduler) RegisterWorkGroup(cfg WorkGroupConfig) (WorkGroupHandle, error) {
+	s.tickMu.Lock()
+	defer s.tickMu.Unlock()
 	if cfg.ID == "" {
 		return nil, fmt.Errorf("ecs: work group requires non-empty ID")
 	}
@@ -197,6 +211,7 @@ func (s *basicScheduler) RegisterWorkGroup(cfg WorkGroupConfig) (WorkGroupHandle
 		writeSet:       writes,
 		resourceReads:  resourceReads,
 		resourceWrites: resourceWrites,
+		commandBarrier: cfg.CommandBarrier,
 	}
 
 	if err := s.checkCrossGroupConflicts(state); err != nil {
@@ -356,6 +371,10 @@ func (s *basicScheduler) rebuildOrder() {
 }
 
 func (s *basicScheduler) Tick(ctx context.Context, dt time.Duration) error {
+	if !s.tickMu.TryLock() {
+		return ErrConcurrentTick
+	}
+	defer s.tickMu.Unlock()
 	buf := s.pool.Get()
 	defer s.pool.Put(buf)
 
@@ -370,6 +389,15 @@ func (s *basicScheduler) Tick(ctx context.Context, dt time.Duration) error {
 	executedGroups := make([]WorkGroupID, 0, len(groups))
 	asyncHandles := make([]*jobHandle, 0)
 	asyncGroupIDs := make([]WorkGroupID, 0)
+	// A worker-owned context is allocated lazily: synchronized-only ticks need
+	// no cancellation child or extra allocation.
+	workerContextReady := false
+	// Always join workers on an early error, too. No worker may outlive Tick.
+	defer func() {
+		for _, handle := range asyncHandles {
+			handle.Wait()
+		}
+	}()
 
 	for _, group := range groups {
 		if err := ctx.Err(); err != nil {
@@ -379,7 +407,21 @@ func (s *basicScheduler) Tick(ctx context.Context, dt time.Duration) error {
 			continue
 		}
 		if group.mode == WorkGroupModeAsync {
-			handle := s.dispatchAsync(ctx, group, world, dt, tick, logger, tracer)
+			// On failure, wake cooperative workers before joining them even when
+			// the caller supplied Background.
+			if !workerContextReady {
+				workerContext, cancel := context.WithCancel(ctx)
+				ctx = workerContext
+				// Registered after the join defer, so LIFO cancellation runs
+				// first on every return path (and satisfies lostcancel checks).
+				defer cancel()
+				workerContextReady = true
+			}
+			snapshot, err := snapshotWorld(world, group)
+			if err != nil {
+				return fmt.Errorf("ecs: snapshot group %s: %w", group.id, err)
+			}
+			handle := s.dispatchAsync(ctx, group, snapshot, dt, tick, logger, tracer)
 			asyncHandles = append(asyncHandles, handle)
 			asyncGroupIDs = append(asyncGroupIDs, group.id)
 			continue
@@ -396,6 +438,11 @@ func (s *basicScheduler) Tick(ctx context.Context, dt time.Duration) error {
 		}
 		executedGroups = append(executedGroups, group.id)
 		s.publishWorkGroupSummary(summary)
+		if group.commandBarrier {
+			if err := buf.apply(world); err != nil {
+				return err
+			}
+		}
 	}
 
 	for idx, handle := range asyncHandles {
@@ -422,11 +469,8 @@ func (s *basicScheduler) Tick(ctx context.Context, dt time.Duration) error {
 		executedGroups = append(executedGroups, asyncGroupIDs[idx])
 	}
 
-	drained := buf.Drain()
-	if len(drained) > 0 {
-		if err := world.ApplyCommands(drained); err != nil {
-			return err
-		}
+	if err := buf.apply(world); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
@@ -448,6 +492,7 @@ func (s *basicScheduler) runWorkGroup(ctx context.Context, group *workGroupState
 		logger:   groupLogger,
 		tracer:   tracer,
 		commands: buf,
+		readOnly: async,
 	}
 
 	summary := workGroupRunSummary{
@@ -479,11 +524,17 @@ func (s *basicScheduler) runWorkGroup(ctx context.Context, group *workGroupState
 
 		snapshot := buf.Snapshot()
 		result := system.Run(ctx, execCtx)
+		if execCtx.deferErr != nil {
+			result.Err = execCtx.deferErr
+		}
 		if result.Err != nil {
 			if group.policy == ErrorPolicyRetry {
 				systemLogger.Error("system failed, retrying", "err", result.Err)
 				buf.Restore(snapshot)
 				result = system.Run(ctx, execCtx)
+				if execCtx.deferErr != nil {
+					result.Err = execCtx.deferErr
+				}
 				if result.Err == nil {
 					systemLogger.Info("system retry succeeded")
 					if result.Skipped {
@@ -654,6 +705,8 @@ type systemExecutionContext struct {
 	logger   Logger
 	tracer   Tracer
 	commands *CommandBuffer
+	readOnly bool
+	deferErr error
 }
 
 func (c *systemExecutionContext) World() *World { return c.world }
@@ -666,7 +719,33 @@ func (c *systemExecutionContext) Logger() Logger { return c.logger }
 
 func (c *systemExecutionContext) Tracer() Tracer { return c.tracer }
 
-func (c *systemExecutionContext) Defer(cmd Command) { c.commands.Push(cmd) }
+func (c *systemExecutionContext) Defer(cmd Command) {
+	if cmd == nil {
+		return
+	}
+	if c.readOnly {
+		c.deferErr = ErrReadOnlyExecution
+		return
+	}
+	c.commands.Push(cmd)
+}
+
+// CloseScheduler releases worker goroutines after the last tick. Configuration
+// and shutdown are host operations; do not call them from inside a system.
+func CloseScheduler(s Scheduler) {
+	if concrete, ok := s.(*basicScheduler); ok {
+		_ = concrete.Close()
+	}
+}
+func (s *basicScheduler) Close() error {
+	s.tickMu.Lock()
+	defer s.tickMu.Unlock()
+	if s.asyncPool != nil {
+		s.asyncPool.Close()
+		s.asyncPool = nil
+	}
+	return nil
+}
 
 // noopLogger is used until a real logger is supplied.
 type noopLogger struct{}

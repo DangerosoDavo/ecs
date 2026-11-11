@@ -1,3 +1,3 @@
 module github.com/DangerosoDavo/ecs
 
-go 1.25
+go 1.27.4

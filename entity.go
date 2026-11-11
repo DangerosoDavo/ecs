@@ -50,6 +50,7 @@ type EntityRegistry struct {
 	generations []uint32
 	free        []uint32
 	alive       uint32
+	allocated   []bool
 }
 
 // Create issues a new entity identifier, recycling slots when possible.
@@ -64,9 +65,14 @@ func (r *EntityRegistry) Create() EntityID {
 	} else {
 		index = uint32(len(r.generations))
 		r.generations = append(r.generations, 0)
+		r.allocated = append(r.allocated, false)
 	}
 
 	r.generations[index]++
+	if r.generations[index] == 0 {
+		r.generations[index]++
+	}
+	r.allocated[index] = true
 	generation := r.generations[index]
 	r.alive++
 	return EntityID{index: index, generation: generation}
@@ -89,7 +95,12 @@ func (r *EntityRegistry) CreateWithID(id EntityID) error {
 	gen := id.Generation()
 
 	for idx >= uint32(len(r.generations)) {
+		// Intermediate restored-index holes must remain available for Create.
+		if uint32(len(r.generations)) != idx {
+			r.free = append(r.free, uint32(len(r.generations)))
+		}
 		r.generations = append(r.generations, 0)
+		r.allocated = append(r.allocated, false)
 	}
 
 	currentGen := r.generations[idx]
@@ -115,6 +126,7 @@ func (r *EntityRegistry) CreateWithID(id EntityID) error {
 	}
 
 	r.generations[idx] = gen
+	r.allocated[idx] = true
 	if slotFree {
 		r.free = append(r.free[:freeIdx], r.free[freeIdx+1:]...)
 	}
@@ -136,6 +148,12 @@ func (r *EntityRegistry) Destroy(id EntityID) bool {
 	}
 
 	r.alive--
+	r.allocated[id.index] = false
+	// Retire exhausted slots instead of wrapping into an ancient live handle.
+	if r.generations[id.index] >= ^uint32(0)-1 {
+		r.generations[id.index] = ^uint32(0)
+		return true
+	}
 	r.generations[id.index]++
 	r.free = append(r.free, id.index)
 	return true
@@ -175,5 +193,5 @@ func (r *EntityRegistry) isAliveLocked(id EntityID) bool {
 	if idx >= uint32(len(r.generations)) {
 		return false
 	}
-	return r.generations[idx] == id.generation
+	return r.allocated[idx] && r.generations[idx] == id.generation
 }

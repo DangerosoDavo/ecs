@@ -109,11 +109,15 @@ func (p *workerPool) Submit(ctx context.Context, fn func(context.Context) jobRes
 		return &jobHandle{result: result}
 	default:
 	}
-	if safeSendJob(p.jobs, job) {
-		return &jobHandle{result: result}
+	select {
+	case p.jobs <- job:
+	case <-p.closed:
+		result <- jobResult{err: ErrWorkerPoolClosed}
+		close(result)
+	case <-ctx.Done():
+		result <- jobResult{err: ctx.Err()}
+		close(result)
 	}
-	result <- jobResult{err: ErrWorkerPoolClosed}
-	close(result)
 	return &jobHandle{result: result}
 }
 
@@ -123,7 +127,6 @@ func (p *workerPool) Close() {
 	}
 	p.once.Do(func() {
 		close(p.closed)
-		close(p.jobs)
 	})
 	p.wg.Wait()
 }
@@ -141,14 +144,4 @@ func (h *jobHandle) Wait() jobResult {
 		return jobResult{}
 	}
 	return res
-}
-
-func safeSendJob(ch chan jobRequest, job jobRequest) (ok bool) {
-	defer func() {
-		if recover() != nil {
-			ok = false
-		}
-	}()
-	ch <- job
-	return true
 }

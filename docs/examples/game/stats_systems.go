@@ -32,7 +32,10 @@ func (HealthSystem) Run(ctx context.Context, exec ecs.ExecutionContext) ecs.Syst
 		return ecs.SystemResult{Err: err}
 	}
 
-	modifiersView, _ := exec.World().ViewComponent("StatModifiers")
+	modifiersView, err := exec.World().ViewComponent("StatModifiers")
+	if err != nil {
+		return ecs.SystemResult{Err: err}
+	}
 
 	// Iterate through entities with current stats
 	currentStatsView.Iterate(func(id ecs.EntityID, component any) bool {

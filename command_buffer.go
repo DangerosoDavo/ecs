@@ -45,7 +45,20 @@ func (b *CommandBuffer) Restore(snapshot int) {
 	if snapshot >= len(b.commands) {
 		return
 	}
+	clear(b.commands[snapshot:])
 	b.commands = b.commands[:snapshot]
+}
+
+// Reset retains capacity for reuse and releases command payload references.
+// Unlike Drain, it does not transfer slice ownership to the caller.
+func (b *CommandBuffer) Reset() { clear(b.commands); b.commands = b.commands[:0] }
+
+// apply executes in order without transferring ownership. Successfully
+// applied commands are not rolled back if a later command fails.
+func (b *CommandBuffer) apply(world *World) error {
+	err := world.ApplyCommands(b.commands)
+	b.Reset()
+	return err
 }
 
 // CommandBufferPool reuses buffers to reduce allocations.
@@ -70,6 +83,6 @@ func (p *CommandBufferPool) Put(buf *CommandBuffer) {
 	if buf == nil {
 		return
 	}
-	buf.Drain()
+	buf.Reset()
 	p.pool.Put(buf)
 }

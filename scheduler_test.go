@@ -281,8 +281,8 @@ func TestSchedulerAllowsMultipleWritersWithinSynchronousGroup(t *testing.T) {
 	writerB := &testSystem{name: "writerB", desc: ecs.SystemDescriptor{Writes: []ecs.ComponentType{"comp"}}, executed: &order}
 
 	group := ecs.WorkGroupConfig{
-		ID:     "writers",
-		Mode:   ecs.WorkGroupModeSynchronized,
+		ID:   "writers",
+		Mode: ecs.WorkGroupModeSynchronized,
 		Systems: []ecs.System{
 			writerA,
 			writerB,

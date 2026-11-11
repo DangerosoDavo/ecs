@@ -45,8 +45,8 @@ type sharedValue struct {
 type sharedStore struct {
 	mu            sync.RWMutex
 	typ           ecs.ComponentType
-	entityToValue map[ecs.EntityID]uint32  // maps entity to value ID
-	valueToData   map[uint32]*sharedValue  // maps value ID to actual data
+	entityToValue map[ecs.EntityID]uint32 // maps entity to value ID
+	valueToData   map[uint32]*sharedValue // maps value ID to actual data
 	nextValueID   uint32
 	count         int // number of entities with components (not unique values)
 }
@@ -102,7 +102,7 @@ func (s *sharedStore) Iterate(fn func(ecs.EntityID, any) bool) {
 }
 
 func (s *sharedStore) Set(id ecs.EntityID, value any) error {
-	if id.IsZero() {
+	if id.IsZero() || id.Generation() == 0 {
 		return fmt.Errorf("shared: cannot set zero entity")
 	}
 

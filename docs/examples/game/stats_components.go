@@ -25,10 +25,10 @@ type CurrentStats struct {
 
 // StatModifier represents a time-limited modification to stats (buff or debuff).
 type StatModifier struct {
-	Type       ModifierType
-	Value      float64 // multiplier or flat value
-	ExpiresAt  time.Time
-	Source     string // what caused this modifier (e.g., "strength_potion", "poison")
+	Type      ModifierType
+	Value     float64 // multiplier or flat value
+	ExpiresAt time.Time
+	Source    string // what caused this modifier (e.g., "strength_potion", "poison")
 }
 
 type ModifierType int

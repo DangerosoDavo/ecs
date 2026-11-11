@@ -33,6 +33,9 @@ type WorkGroupConfig struct {
 	Interval    TickInterval
 	ErrorPolicy ErrorPolicy
 	Priority    int
+	// CommandBarrier applies queued synchronized commands after this group.
+	// Without it, commands remain deferred until the end of the tick.
+	CommandBarrier bool
 }
 
 // WorkGroupMode selects synchronous or asynchronous execution.
@@ -171,13 +174,16 @@ type ExecutionContext interface {
 
 // World encapsulates entity/component storage and resources.
 type World struct {
-	registry      *EntityRegistry
-	storage       StorageProvider
-	resources     ResourceContainer
-	changed       map[EntityID]bool // entity-level dirty set for change tracking
-	mu            sync.RWMutex
-	disabled      map[EntityID]map[ComponentType]bool
-	componentCfgs map[ComponentType]ComponentConfig
+	registry       *EntityRegistry
+	storage        StorageProvider
+	resources      ResourceContainer
+	changed        map[EntityID]bool // entity-level dirty set for change tracking
+	mu             sync.RWMutex
+	disabled       map[EntityID]map[ComponentType]bool
+	componentCfgs  map[ComponentType]ComponentConfig
+	changeHistory  []Change
+	changeSequence uint64
+	changeCapacity int
 }
 
 // StorageProvider manages component storage backends.
@@ -242,7 +248,8 @@ type ComponentStore interface {
 	Clear()
 }
 
-// ComponentView exposes read-only iteration over stored components.
+// ComponentView exposes no structural mutation methods. Payloads are arbitrary
+// Go values and may contain mutable pointers; live views require owner access.
 type ComponentView interface {
 	ComponentType() ComponentType
 	Len() int
@@ -280,5 +287,3 @@ type Tracer interface {
 type TraceSpan interface {
 	End()
 }
-
-// NOTE: scaffolding only; implementations arrive in future stages.

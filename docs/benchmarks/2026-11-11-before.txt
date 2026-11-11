@@ -1,0 +1,32 @@
+go version go1.27.4 windows/amd64
+goos: windows
+goarch: amd64
+pkg: github.com/DangerosoDavo/ecs
+cpu: Intel(R) Core(TM) i7-6700K CPU @ 4.00GHz
+BenchmarkDenseIteration/full_10000         	   25561	     17880 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000         	   17908	     18544 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000         	   21168	     17697 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000         	   22765	     15127 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/full_10000         	   26575	     14264 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000         	   31759	     10231 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000         	   31604	     10709 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000         	   30853	     10589 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000         	   36153	     12651 ns/op	       0 B/op	       0 allocs/op
+BenchmarkDenseIteration/sparse_100_of_10000         	   34168	     10988 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCommandBufferReuse                         	  122894	      2897 ns/op	    4464 B/op	       8 allocs/op
+BenchmarkCommandBufferReuse                         	  127338	      2458 ns/op	    4464 B/op	       8 allocs/op
+BenchmarkCommandBufferReuse                         	  153388	      2340 ns/op	    4464 B/op	       8 allocs/op
+BenchmarkCommandBufferReuse                         	  130982	      5374 ns/op	    4464 B/op	       8 allocs/op
+BenchmarkCommandBufferReuse                         	  123346	      3053 ns/op	    4464 B/op	       8 allocs/op
+BenchmarkSchedulerTick                              	  305968	      1443 ns/op	     240 B/op	      10 allocs/op
+BenchmarkSchedulerTick                              	  306033	      1547 ns/op	     240 B/op	      10 allocs/op
+BenchmarkSchedulerTick                              	  384052	      1592 ns/op	     240 B/op	      10 allocs/op
+BenchmarkSchedulerTick                              	  345950	      1941 ns/op	     240 B/op	      10 allocs/op
+BenchmarkSchedulerTick                              	  341928	      1538 ns/op	     240 B/op	      10 allocs/op
+BenchmarkAsyncRead1000                              	   10000	     34803 ns/op	     696 B/op	      17 allocs/op
+BenchmarkAsyncRead1000                              	   10000	     33408 ns/op	     696 B/op	      17 allocs/op
+BenchmarkAsyncRead1000                              	   10000	     33957 ns/op	     696 B/op	      17 allocs/op
+BenchmarkAsyncRead1000                              	   10000	     34484 ns/op	     696 B/op	      17 allocs/op
+BenchmarkAsyncRead1000                              	   10000	     37568 ns/op	     696 B/op	      17 allocs/op
+PASS
+ok  	github.com/DangerosoDavo/ecs	13.321s

@@ -15,6 +15,7 @@ func NewWorld(opts ...WorldOption) *World {
 		changed:        make(map[EntityID]bool),
 		disabled:       make(map[EntityID]map[ComponentType]bool),
 		componentCfgs:  make(map[ComponentType]ComponentConfig),
+		changeCapacity: 1024,
 	}
 	for _, opt := range opts {
 		opt(w)
@@ -109,9 +110,14 @@ func (w *World) ViewComponent(t ComponentType) (ComponentView, error) {
 // registry slot. Prefer this over calling Registry().Destroy() directly to
 // ensure component stores are cleaned up.
 func (w *World) DestroyEntity(id EntityID) bool {
+	if !w.registry.IsAlive(id) {
+		return false
+	}
 	w.storage.RemoveEntity(id)
 	w.mu.Lock()
 	delete(w.disabled, id)
+	delete(w.changed, id)
+	w.recordChangeLocked(id, ChangeDestroyed)
 	w.mu.Unlock()
 	return w.registry.Destroy(id)
 }
@@ -132,6 +138,7 @@ func (w *World) ApplyCommands(commands []Command) error {
 func (w *World) MarkChanged(id EntityID) {
 	w.mu.Lock()
 	w.changed[id] = true
+	w.recordChangeLocked(id, ChangeUpdated)
 	w.mu.Unlock()
 }
 
@@ -177,6 +184,16 @@ var ErrComponentNonDisableable = fmt.Errorf("ecs: component type is non-disablea
 // paused construction) can do so explicitly. Returns an error if the
 // component type was registered as non-disableable.
 func (w *World) DisableComponent(id EntityID, t ComponentType) error {
+	if !w.registry.IsAlive(id) {
+		return ErrStaleEntity
+	}
+	view, err := w.storage.View(t)
+	if err != nil {
+		return err
+	}
+	if !view.Has(id) {
+		return ErrComponentNotPresent
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if cfg, ok := w.componentCfgs[t]; ok && cfg.NonDisableable {
@@ -189,12 +206,16 @@ func (w *World) DisableComponent(id EntityID, t ComponentType) error {
 	}
 	set[t] = true
 	w.changed[id] = true
+	w.recordChangeLocked(id, ChangeUpdated)
 	return nil
 }
 
 // EnableComponent restores iteration visibility for a single component on an
 // entity. No-op if the component was not disabled.
 func (w *World) EnableComponent(id EntityID, t ComponentType) {
+	if !w.registry.IsAlive(id) {
+		return
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	set, ok := w.disabled[id]
@@ -209,6 +230,7 @@ func (w *World) EnableComponent(id EntityID, t ComponentType) {
 		delete(w.disabled, id)
 	}
 	w.changed[id] = true
+	w.recordChangeLocked(id, ChangeUpdated)
 }
 
 // IsComponentDisabled reports whether a component on an entity is currently
@@ -228,6 +250,9 @@ func (w *World) IsComponentDisabled(id EntityID, t ComponentType) bool {
 // one-shot pause without enumerating components. Returns the list of types
 // that were newly disabled so callers can log or restore state.
 func (w *World) DisableEntity(id EntityID) []ComponentType {
+	if !w.registry.IsAlive(id) {
+		return nil
+	}
 	types := w.storage.ComponentsFor(id)
 	if len(types) == 0 {
 		return nil
@@ -251,12 +276,16 @@ func (w *World) DisableEntity(id EntityID) []ComponentType {
 	}
 	if len(disabled) > 0 {
 		w.changed[id] = true
+		w.recordChangeLocked(id, ChangeUpdated)
 	}
 	return disabled
 }
 
 // EnableEntity re-enables every disabled component on the entity.
 func (w *World) EnableEntity(id EntityID) {
+	if !w.registry.IsAlive(id) {
+		return
+	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if _, ok := w.disabled[id]; !ok {
@@ -264,6 +293,7 @@ func (w *World) EnableEntity(id EntityID) {
 	}
 	delete(w.disabled, id)
 	w.changed[id] = true
+	w.recordChangeLocked(id, ChangeUpdated)
 }
 
 // DisabledComponents returns a snapshot of currently disabled component types

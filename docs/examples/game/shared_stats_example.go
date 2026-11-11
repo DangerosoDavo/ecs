@@ -22,10 +22,10 @@ import (
 //
 // This example demonstrates the basic shared storage mechanism.
 type GameStats struct {
-	MaxHealth     int
-	AttackDamage  int
-	Defense       int
-	MoveSpeed     float64
+	MaxHealth        int
+	AttackDamage     int
+	Defense          int
+	MoveSpeed        float64
 	MiningEfficiency int
 }
 
@@ -137,26 +137,26 @@ func ExampleSharedStats() {
 
 	// Define entity archetypes (templates) with shared stats
 	zombieStats := GameStats{
-		MaxHealth:     50,
-		AttackDamage:  10,
-		Defense:       5,
-		MoveSpeed:     2.0,
+		MaxHealth:        50,
+		AttackDamage:     10,
+		Defense:          5,
+		MoveSpeed:        2.0,
 		MiningEfficiency: 0,
 	}
 
 	minerStats := GameStats{
-		MaxHealth:     75,
-		AttackDamage:  5,
-		Defense:       8,
-		MoveSpeed:     3.0,
+		MaxHealth:        75,
+		AttackDamage:     5,
+		Defense:          8,
+		MoveSpeed:        3.0,
 		MiningEfficiency: 15,
 	}
 
 	bossStats := GameStats{
-		MaxHealth:     500,
-		AttackDamage:  50,
-		Defense:       30,
-		MoveSpeed:     1.5,
+		MaxHealth:        500,
+		AttackDamage:     50,
+		Defense:          30,
+		MoveSpeed:        1.5,
 		MiningEfficiency: 0,
 	}
 
@@ -165,8 +165,8 @@ func ExampleSharedStats() {
 
 	// Spawn 100 zombies - they all share the SAME GameStats instance
 	for i := 0; i < 100; i++ {
-		var zombieID ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&zombieID))
+		zombieID := world.Registry().Create()
+
 		cmds.Push(ecs.NewAddComponentCommand(zombieID, "GameStats", zombieStats))
 		cmds.Push(ecs.NewAddComponentCommand(zombieID, "Position", Position{
 			X: float64(i * 10),
@@ -176,8 +176,8 @@ func ExampleSharedStats() {
 
 	// Spawn 50 miners - they all share the SAME GameStats instance
 	for i := 0; i < 50; i++ {
-		var minerID ecs.EntityID
-		cmds.Push(ecs.NewCreateEntityCommand(&minerID))
+		minerID := world.Registry().Create()
+
 		cmds.Push(ecs.NewAddComponentCommand(minerID, "GameStats", minerStats))
 		cmds.Push(ecs.NewAddComponentCommand(minerID, "Position", Position{
 			X: float64(i * 15),
@@ -186,8 +186,8 @@ func ExampleSharedStats() {
 	}
 
 	// Spawn 1 boss with unique stats
-	var bossID ecs.EntityID
-	cmds.Push(ecs.NewCreateEntityCommand(&bossID))
+	bossID := world.Registry().Create()
+
 	cmds.Push(ecs.NewAddComponentCommand(bossID, "GameStats", bossStats))
 	cmds.Push(ecs.NewAddComponentCommand(bossID, "Position", Position{X: 500, Y: 500}))
 
@@ -231,10 +231,10 @@ func ExampleModifyingSharedStats() {
 	// To "modify" shared stats, remove the old value and add a new one
 	// This automatically unshares the entity if others were using the same stats
 	upgradedStats := GameStats{
-		MaxHealth:    75,    // upgraded
-		AttackDamage: 15,    // upgraded
-		Defense:      8,     // upgraded
-		MoveSpeed:    2.0,   // same
+		MaxHealth:    75,  // upgraded
+		AttackDamage: 15,  // upgraded
+		Defense:      8,   // upgraded
+		MoveSpeed:    2.0, // same
 	}
 
 	cmds = ecs.NewCommandBuffer()
@@ -276,7 +276,7 @@ func ComparisonDenseVsShared() {
 	worldShared.ApplyCommands(cmds.Drain())
 
 	fmt.Println("Shared Storage: 1 shared GameStats instance in memory (referenced 1000 times)")
-	fmt.Println("Memory savings: ~99.9%")
+	fmt.Println("Duplicate definition payloads are reduced; profile total storage overhead separately")
 }
 
 // IMPORTANT NOTES:

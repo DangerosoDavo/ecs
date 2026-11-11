@@ -63,15 +63,14 @@ func (s *denseStore) Iterate(fn func(ecs.EntityID, any) bool) {
 		if !slot.occupied {
 			continue
 		}
-		id := ecs.EntityIDFromParts(uint32(idx), slot.generation)
-		if !fn(id, slot.value) {
+		if !fn(ecs.EntityIDFromParts(uint32(idx), slot.generation), slot.value) {
 			return
 		}
 	}
 }
 
 func (s *denseStore) Set(id ecs.EntityID, value any) error {
-	if id.IsZero() {
+	if id.IsZero() || id.Generation() == 0 {
 		return fmt.Errorf("dense: cannot set zero entity")
 	}
 	s.ensureCapacity(int(id.Index()) + 1)

@@ -1,5 +1,11 @@
 # ECS Scheduler Architecture
 
+> Implementation update (2026-11-11): the roadmap below is historical design
+> context. Current concurrency, barrier, lifecycle, change-journal and worker
+> contracts are defined by `docs/adr/0002-maintenance-semantics.md` and
+> `docs/maintenance.md`. Workers are joined and use copied declared-read worlds;
+> they are not non-blocking I/O. Benchmark results require measured evidence.
+
 ## Overview
 - Build a reusable ECS (Entity-Component-System) scheduler for Go gameservers that can embed into diverse host projects.
 - Provide deterministic synchronized execution plus optional asynchronous offloading without blocking tick progress.

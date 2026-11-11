@@ -55,3 +55,46 @@ func TestDenseStoreRejectsZeroEntity(t *testing.T) {
 		t.Fatalf("expected error for zero entity")
 	}
 }
+
+func TestDenseOccupancyBoundariesAndClear(t *testing.T) {
+	for _, strategy := range []ecs.StorageStrategy{NewDenseStrategy(), NewBitmapStrategy()} {
+		t.Run(strategy.Name(), func(t *testing.T) { testIndexedStoreOccupancy(t, strategy) })
+	}
+}
+
+func testIndexedStoreOccupancy(t *testing.T, strategy ecs.StorageStrategy) {
+	store := strategy.NewStore("value")
+	indices := []uint32{0, 63, 64, 127, 128, 10000}
+	for _, idx := range indices {
+		if err := store.Set(ecs.EntityIDFromParts(idx, 1), int(idx)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store.Remove(ecs.EntityIDFromParts(64, 1))
+	if err := store.Set(ecs.EntityIDFromParts(64, 2), 64); err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	last := uint32(0)
+	store.Iterate(func(id ecs.EntityID, value any) bool {
+		if count > 0 && id.Index() <= last {
+			t.Fatal("order changed")
+		}
+		last = id.Index()
+		count++
+		return true
+	})
+	if count != len(indices) || store.Has(ecs.EntityIDFromParts(64, 1)) {
+		t.Fatal("occupancy/generation mismatch")
+	}
+	count = 0
+	store.Iterate(func(ecs.EntityID, any) bool { count++; return false })
+	if count != 1 {
+		t.Fatal("early stop ignored")
+	}
+	store.Clear()
+	store.Iterate(func(ecs.EntityID, any) bool { t.Fatal("clear left bitmap entries"); return true })
+	if store.Len() != 0 {
+		t.Fatal("clear left count")
+	}
+}
